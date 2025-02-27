@@ -1,11 +1,12 @@
+import random
+import re
 import requests
 from bs4 import BeautifulSoup
-import random
 from datetime import datetime, timedelta
-
 
 LOGIN_URL = 'https://api.factorialhr.com/en-US/users/sign_in'
 GRAPHQL_URL = "https://api.factorialhr.com/graphql?CreateAttendanceShift"
+USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:135.0) Gecko/20100101 Firefox/135.0"
 
 def login_and_get_session(email, password):
     # Create a session object to persist cookies across requests.
@@ -39,7 +40,7 @@ def login_and_get_session(email, password):
 
     # Optionally, add headers if required by the server.
     post_headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:135.0) Gecko/20100101 Firefox/135.0",
+        "User-Agent": USER_AGENT,
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Content-Type": "application/x-www-form-urlencoded",
         "Origin": "https://api.factorialhr.com",
@@ -61,7 +62,7 @@ def create_attendance_shift(session, date, clock_in, clock_out, employee_id):
     Uses the authenticated session to perform a GraphQL mutation that creates an attendance shift.
     """
     headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:135.0) Gecko/20100101 Firefox/135.0",
+        "User-Agent": USER_AGENT,
         "Accept": "*/*",
         "Referer": "https://app.factorialhr.com/",
         "content-type": "application/json",
@@ -232,7 +233,6 @@ def create_attendance_shift(session, date, clock_in, clock_out, employee_id):
     
     if response.ok:
         print("Attendance shift created successfully!")
-        print(response.json())
     else:
         print("Failed to create attendance shift.")
         print("Status code:", response.status_code)
@@ -263,6 +263,21 @@ def get_datetimes(date_str):
 
     return clock_in_morning_str, clock_out_morning_str, clock_in_afternoon_str, clock_out_afternoon_str
 
+def validate_args(parser, args):
+    # Validate email format.
+    if not re.match(r"[^@]+@[^@]+\.[^@]+", args.email):
+        parser.error("Invalid email address format.")
+
+    # Validate date format.
+    try:
+        datetime.strptime(args.date, "%Y-%m-%d")
+    except ValueError:
+        parser.error("Invalid date format. Expected YYYY-MM-DD.")
+
+    # Validate employee id is positive.
+    if args.employee_id <= 0:
+        parser.error("Employee ID must be a positive integer.")
+
 if __name__ == '__main__':
     import argparse
 
@@ -272,6 +287,8 @@ if __name__ == '__main__':
     parser.add_argument('--date', required=True, help='Date for the shift (YYYY-MM-DD)')
     parser.add_argument('--employee-id', required=True, type=int, help='Employee ID')
     args = parser.parse_args()
+
+    validate_args(parser, args)
 
     # Log in and retrieve the session.
     session = login_and_get_session(args.email, args.password)
